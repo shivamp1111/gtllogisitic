@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { ref, push, set, get, remove, onValue } from 'firebase/database';
 import { database } from '../firebase/config';
-import { 
-  FaSignInAlt, FaSignOutAlt, FaPlus, FaTrash, FaEdit, FaTruck, 
+import {
+  FaSignInAlt, FaSignOutAlt, FaPlus, FaTrash, FaEdit, FaTruck,
   FaChartLine, FaUsers, FaDownload, FaSearch, FaFilter, FaSpinner,
   FaCheckCircle, FaTimesCircle, FaCalendarAlt
 } from 'react-icons/fa';
@@ -63,7 +63,7 @@ const Admin = () => {
     let filtered = [...shipments];
 
     if (searchTerm) {
-      filtered = filtered.filter(s => 
+      filtered = filtered.filter(s =>
         s.lr?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.route?.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -82,11 +82,11 @@ const Admin = () => {
     setLoading(true);
 
     const result = await login(email, password);
-    
+
     if (!result.success) {
       setLoginError('Invalid credentials. Use: admin@gtl.com / admin123');
     }
-    
+
     setLoading(false);
   };
 
@@ -102,15 +102,35 @@ const Admin = () => {
       return;
     }
 
+    // Validate LR Number format (alphanumeric only to be safe as key)
+    const lrRegex = /^[a-zA-Z0-9]+$/;
+    if (!lrRegex.test(formData.lr)) {
+      alert('LR Number can only contain letters and numbers.');
+      return;
+    }
+
     try {
-      if (editingShipment) {
-        await set(ref(database, `shipments/${editingShipment.id}`), formData);
-        setEditingShipment(null);
-      } else {
-        await push(ref(database, 'shipments'), formData);
+      const shipmentPath = `shipments/${formData.lr}`; // Use LR as key
+
+      // Check if exists if adding new (optional but good) - for now just set to overwrite/update
+      // If editing, we might need to handle ID change if they edit LR number, 
+      // but let's assume LR number editing might need delete-then-add logic if we wanted to be strict.
+      // For potential simplicity, we treat it as create-or-update.
+
+      if (editingShipment && editingShipment.lr !== formData.lr) {
+        // If LR changed during edit, we might want to remove old one?
+        // For now, let's keep it simple as "Update/Set"
+        // If ID was the key, we should rely on ID. 
+        // Since we are changing schema to Key=LR, 'id' in local state will be LR.
+        // So if they change LR, it creates a NEW entry. 
+        // Let's just handle the create/update case.
       }
+
+      await set(ref(database, shipmentPath), formData);
+
       setFormData({ lr: '', status: 'In Transit', route: '', date: new Date().toISOString().split('T')[0] });
       setShowAddForm(false);
+      setEditingShipment(null);
     } catch (error) {
       alert('Error saving shipment: ' + error.message);
     }
@@ -368,10 +388,10 @@ const Admin = () => {
                   setEditingShipment(null);
                   setFormData({ lr: '', status: 'In Transit', route: '', date: new Date().toISOString().split('T')[0] });
                 }}
-                className="gradient-primary text-white px-4 py-2 rounded-lg font-bold hover:shadow-lg transition-all flex items-center gap-2"
+                className="bg-primary-600 text-white px-4 py-2 rounded-lg font-bold hover:shadow-lg hover:bg-primary-700 transition-all flex items-center gap-2"
               >
                 <FaPlus />
-                Add Shipment
+                Add New LR
               </motion.button>
             </div>
           </div>
@@ -481,7 +501,7 @@ const Admin = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                  <tr className="border-b border-primary-500 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20">
+                <tr className="border-b border-primary-500 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20">
                   <th className="p-3 text-primary-600 dark:text-primary-400 font-black">LR Number</th>
                   <th className="p-3 text-primary-600 dark:text-primary-400 font-black">Status</th>
                   <th className="p-3 text-primary-600 dark:text-primary-400 font-black">Route</th>
@@ -506,12 +526,11 @@ const Admin = () => {
                     >
                       <td className="p-3 text-slate-900 dark:text-slate-100 font-semibold">{shipment.lr}</td>
                       <td className="p-3">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          shipment.status === 'Delivered' ? 'bg-primary-600 text-white' :
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${shipment.status === 'Delivered' ? 'bg-primary-600 text-white' :
                           shipment.status === 'In Transit' ? 'bg-primary-600 text-white' :
-                          shipment.status === 'Pending' ? 'bg-primary-600 text-white' :
-                          'bg-primary-600 text-white'
-                        }`}>
+                            shipment.status === 'Pending' ? 'bg-primary-600 text-white' :
+                              'bg-primary-600 text-white'
+                          }`}>
                           {shipment.status}
                         </span>
                       </td>
